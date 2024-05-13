@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>BACnet Configuration</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            form {
+                margin-bottom: 20px;
+            }
+            #progressBar {
+                width: 100%;
+                background-color: #ddd;
+            }
+            #progressBar div {
+                height: 20px;
+                background-color: #4caf50;
+                text-align: center;
+                line-height: 20px;
+                color: white;
+                width: 0%;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Update BACnet Configuration</h1>
+        <form id="networkForm">
+            Broadcast Address:
+            <input
+                type="text"
+                id="broadcastAddress"
+                value="192.168.1.255"
+            /><br />
+            Port: <input type="number" id="port" value="47808" /><br />
+            Start Network:
+            <input type="number" id="startNetwork" value="201" /><br />
+            End Network:
+            <input type="number" id="endNetwork" value="210" /><br />
+            Start MAC:
+            <input type="number" id="startMac" value="0" /><br />
+            End MAC:
+            <input type="number" id="endMac" value="20" /><br />
+            APDU Timeout:
+            <input type="number" id="adpuTimeout" value="6000" /><br />
+            <button type="button" id="discoverBtn" onclick="updateConfig()">
+                Discover Networks
+            </button>
+        </form>
+        <div id="progressBar"><div>0%</div></div>
+        <div id="devicesList"><h2>Discovered Devices:</h2></div>
+        <button type="button" id="saveBtn" onclick="saveDevice()">
+            Save Devices
+        </button>
+
+        <script>
+            function updateConfig() {
+                var data = {
+                    broadcastAddress:
+                        document.getElementById("broadcastAddress").value,
+                    port: parseInt(document.getElementById("port").value),
+                    startNetwork: parseInt(
+                        document.getElementById("startNetwork").value
+                    ),
+                    endNetwork: parseInt(
+                        document.getElementById("endNetwork").value
+                    ),
+                    adpuTimeout: parseInt(
+                        document.getElementById("adpuTimeout").value
+                    ),
+                    startMac: parseInt(
+                        document.getElementById("startMac").value
+                    ),
+                    endMac: parseInt(document.getElementById("endMac").value),
+                };
+
+                document.getElementById("discoverBtn").disabled = true;
+                document.getElementById("saveBtn").disabled = true;
+
+                fetch("/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                })
+                    .then((response) => response.text())
+                    .then((data) => {
+                        alert(data);
+                        fetchDevices(); // Fetch and update the device list after configuration update
+                    })
+                    .catch((error) => console.error("Error:", error))
+                    .finally(() => {
+                        clearInterval(progressInterval);
+                        document.getElementById("discoverBtn").disabled = false;
+                        document.getElementById("saveBtn").disabled = false;
+                        setProgressBar(100); // Complete the progress bar
+                    });
+
+                let progressInterval = setInterval(() => {
+                    fetchProgress();
+                }, 1000); // Update progress every second
+            }
+
+            function fetchDevices() {
+                fetch("/devices")
+                    .then((response) => response.json())
+                    .then((devices) => {
+                        const list = document.getElementById("devicesList");
+                        list.innerHTML = "<h2>Discovered Devices:</h2>";
+                        devices.forEach((device) => {
+                            list.innerHTML += `<p>Device ID: ${device.deviceId}, MAC: ${device.mac}, Device Name: ${device.name}, Network: ${device.network}</p>`;
+                        });
+                    })
+                    .catch((error) =>
+                        console.error("Error fetching devices:", error)
+                    );
+            }
+
+            function saveDevice() {
+                fetch("/devices")
+                    .then((response) => response.json())
+                    .then((devices) => {
+                        fetch("/save-device", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(devices),
+                        })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                alert(data.message);
+                            })
+                            .catch((error) =>
+                                console.error("Error saving devices:", error)
+                            );
+                    })
+                    .catch((error) =>
+                        console.error("Error fetching devices to save:", error)
+                    );
+            }
+
+            function fetchProgress() {
+                fetch("/progress")
+                    .then((response) => response.json())
+                    .then((data) => {
+                        let percent = (data.progress / data.total) * 100;
+                        setProgressBar(percent);
+                    })
+                    .catch((error) =>
+                        console.error("Error fetching progress:", error)
+                    );
+            }
+
+            function setProgressBar(percent) {
+                const progressBar =
+                    document.getElementById("progressBar").firstElementChild;
+                progressBar.style.width = percent.toFixed(2) + "%";
+                progressBar.textContent = percent.toFixed(2) + "%";
+            }
+        </script>
+    </body>
+</html>
